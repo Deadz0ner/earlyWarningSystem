@@ -71,8 +71,10 @@ Status: ✅ Ready
 ```
 Risk Signals:
 ⚫ DPO: CRITICAL
+⚫ DPO Velocity: CRITICAL
 ⚫ Utilization: CRITICAL
 ⚫ Late Payments: CRITICAL
+⚫ Payment Coverage: CRITICAL
 ⚫ Order Trend: CRITICAL
 ⚫ Order Volatility: CRITICAL
 ```
@@ -109,6 +111,9 @@ curl -X POST http://localhost:3000/api/analyze
 ```
 
 **Response:**
+
+*Note: Top 10 is sorted by `defaultProbability` (descending), then `tierScore` as tiebreaker. Only non-HEALTHY, non-UNKNOWN dealers are included.*
+
 ```json
 {
   "success": true,
@@ -121,85 +126,72 @@ curl -X POST http://localhost:3000/api/analyze
       "anchorId": "ANCHOR_A",
       "profile": "HIGHRISK",
       "tier": "CRITICAL",
-      "tierScore": 95,
+      "tierScore": 450,
+      "defaultProbability": 0.872,
       "metrics": {
+        "status": "OK",
+        "confidence": 1.0,
+        "monthsAvailable": 12,
         "daysPayableOutstanding": 95,
         "utilization": 0.919,
         "orderDeclinePercent": 0.450,
-        "orderVolatility": 0.481,
+        "seasonalAdjustedOrderDecline": 0.430,
+        "orderVolatility": 0.321,
+        "dpoDifference": 42,
+        "dpoVelocity": 22,
         "latePaymentCount": 3,
-        "totalOrderValue": 420000,
+        "paymentCoverage": 0.0,
+        "totalOrderValue": 42000,
         "currentBalance": 2940000,
         "monthlyEMI": 32000,
-        "paymentReceived": 0
+        "paymentReceived": 0,
+        "missingDataFlags": []
       },
       "signals": {
         "dpo": "CRITICAL",
         "utilization": "CRITICAL",
         "latePayments": "CRITICAL",
         "orderTrend": "CRITICAL",
-        "volatility": "CRITICAL"
+        "volatility": "CRITICAL",
+        "dpoVelocity": "CRITICAL",
+        "paymentCoverage": "CRITICAL"
       },
-      "explanation": "⚠️ CRITICAL: Dealer_042 is showing severe distress signals. • Payment delay: DPO is 95 days (critical threshold: 90+ days). • High leverage: Utilization is 91.9% (critical: >90%). • Business collapse: Orders have dropped 45.0%. • Payment failures: 3 late payment incidents.",
-      "llmExplanation": "Dealer_042 faces critical distress: 95-day payment overdue (exceeded RBI default threshold by 5 days), loan utilization at 92% (essentially maxed out), orders down 45% (severe demand loss). Immediate collection action and dealer contact essential—likely unable to recover without significant intervention."
-    },
-    {
-      "dealerId": 71,
-      "dealerName": "Dealer_071",
-      "anchorId": "ANCHOR_B",
-      "profile": "HIGHRISK",
-      "tier": "CRITICAL",
-      "tierScore": 92,
-      "metrics": {
-        "daysPayableOutstanding": 88,
-        "utilization": 0.912,
-        "orderDeclinePercent": 0.420,
-        "orderVolatility": 0.445,
-        "latePaymentCount": 3,
-        "totalOrderValue": 385000,
-        "currentBalance": 2730000,
-        "monthlyEMI": 30000,
-        "paymentReceived": 0
-      },
-      "signals": {
-        "dpo": "CRITICAL",
-        "utilization": "CRITICAL",
-        "latePayments": "CRITICAL",
-        "orderTrend": "CRITICAL",
-        "volatility": "CRITICAL"
-      },
-      "explanation": "⚠️ CRITICAL: Dealer_071 is showing severe distress signals...",
-      "llmExplanation": "Dealer_071 approaching critical default: DPO at 88 days (near 90-day threshold), maxed utilization (91%), orders collapsed 42%. Recommend immediate outreach to understand payment plans..."
+      "explanation": "CRITICAL: Dealer_042 is showing severe distress signals. • 30-day default probability: 87% (HIGH). • Payment delay: DPO is 95 days (critical threshold: 90+ days). • Rapid DPO acceleration: DPO jumped 22 days in one month (emergency signal). • High leverage: Loan utilization is 91.9% (critical: >90%). • Payment failures: 3 late payment incidents in last 3 months. • EMI underpayment: Only paying 0% of expected EMI (critical: <30%). • Business decline: Orders dropped 43.0% (seasonal-adjusted, 3-month vs baseline). • Erratic behavior: Order volatility is 32.1% (suggests cash stress).",
+      "llmExplanation": "Dealer_042 faces critical distress: 95-day payment overdue (exceeded RBI default threshold by 5 days), loan utilization at 92% (essentially maxed out), orders down 43% and EMI payments have stopped completely. Immediate collection action and dealer contact essential—likely unable to recover without significant intervention."
     }
   ]
 }
 ```
+```
 
 ### Endpoint: `GET /api/risk-assessments`
 **Response (Summary):**
+
+*Note: Response includes both `byTier` grouping and a flat `all` array. Sorted by `tierScore` descending, then `analyzedAt` descending.*
+
 ```json
 {
   "success": true,
   "count": 100,
   "byTier": {
     "CRITICAL": [
-      { "dealerId": 42, "dealerName": "Dealer_042", "tier": "CRITICAL", "tierScore": 95 },
-      { "dealerId": 71, "dealerName": "Dealer_071", "tier": "CRITICAL", "tierScore": 92 }
+      { "dealerId": 42, "dealerName": "Dealer_042", "tier": "CRITICAL", "tierScore": 450, "defaultProbability": 0.872 },
+      { "dealerId": 71, "dealerName": "Dealer_071", "tier": "CRITICAL", "tierScore": 380, "defaultProbability": 0.810 }
     ],
     "AT_RISK": [
-      { "dealerId": 89, "dealerName": "Dealer_089", "tier": "AT_RISK", "tierScore": 78 },
-      { "dealerId": 43, "dealerName": "Dealer_043", "tier": "AT_RISK", "tierScore": 72 },
-      { "dealerId": 56, "dealerName": "Dealer_056", "tier": "AT_RISK", "tierScore": 68 }
+      { "dealerId": 89, "dealerName": "Dealer_089", "tier": "AT_RISK", "tierScore": 110, "defaultProbability": 0.420 },
+      { "dealerId": 43, "dealerName": "Dealer_043", "tier": "AT_RISK", "tierScore": 85, "defaultProbability": 0.310 }
     ],
     "WATCH": [
-      { "dealerId": 21, "dealerName": "Dealer_021", "tier": "WATCH", "tierScore": 35 },
-      { "dealerId": 34, "dealerName": "Dealer_034", "tier": "WATCH", "tierScore": 32 }
+      { "dealerId": 21, "dealerName": "Dealer_021", "tier": "WATCH", "tierScore": 40, "defaultProbability": 0.120 },
+      { "dealerId": 34, "dealerName": "Dealer_034", "tier": "WATCH", "tierScore": 35, "defaultProbability": 0.090 }
     ],
     "HEALTHY": [
-      { "dealerId": 1, "dealerName": "Dealer_001", "tier": "HEALTHY", "tierScore": 5 },
+      { "dealerId": 1, "dealerName": "Dealer_001", "tier": "HEALTHY", "tierScore": 0, "defaultProbability": 0.018 },
       ...
     ]
-  }
+  },
+  "all": [ ... ]
 }
 ```
 
@@ -396,7 +388,7 @@ Dealer_002 │ GOOD     │  38d │ 65.5% │ ↑        │ 🟢 HEALTHY
 
 ### Precision & Recall (After 30 Days)
 
-Assuming the system runs for 30 days and we track actual defaults:
+Assuming the system runs for 30 days and I track actual defaults:
 
 ```
 Scenario 1: High Recall (Goal)
@@ -434,6 +426,6 @@ Precision: 3/8 = 38% (good balance)
 
 - All sample outputs use **synthetic data** generated by the system
 - Real portfolio will show different patterns and dealer names
-- LLM explanations will vary based on current Claude API output
+- LLM explanations will vary based on the model's output
 - Dashboard updates after each `/api/analyze` call
 - All metrics are traceable to underlying transaction data

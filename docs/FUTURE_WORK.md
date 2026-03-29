@@ -35,8 +35,8 @@ async function detectAnomalies(dealer, metrics, historicalMetrics) {
     Consider seasonal factors and correlation with anchor performance.
   `;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-opus-4-6',
+  const response = await llmClient.messages.create({
+    model: 'selected-model',
     max_tokens: 100,
     messages: [{ role: 'user', content: prompt }]
   });

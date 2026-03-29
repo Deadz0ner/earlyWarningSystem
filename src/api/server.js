@@ -14,12 +14,11 @@ const { Anthropic } = require('@anthropic-ai/sdk');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Anthropic client (may be null if no key)
-let anthropic = null;
-if (process.env.ANTHROPIC_API_KEY) {
-  anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY
-  });
+// Initialize LLM client (may be null if no key)
+let llmClient = null;
+const apiKey = process.env.LLM_API_KEY || process.env.ANTHROPIC_API_KEY;
+if (apiKey) {
+  llmClient = new Anthropic({ apiKey });
 }
 
 // Middleware
@@ -39,13 +38,13 @@ app.use(express.static(path.join(__dirname, '../../public')));
  *   not a scoring decision — the tier/score are fully deterministic.
  *
  * WHY HAIKU (not Opus):
- *   This is a summarization task on structured data. Haiku is 60x cheaper than Opus
- *   and fast enough for batch analysis of 10-20 flagged dealers. Opus would be
- *   appropriate for complex reasoning (e.g., anomaly detection on raw time series),
- *   not for reformatting structured signals into sentences.
+ *   This is a summarization task on structured data. A smaller/cheaper model is
+ *   sufficient and fast enough for batch analysis of 10-20 flagged dealers.
+ *   A larger model would be appropriate for complex reasoning (e.g., anomaly
+ *   detection on raw time series), not for reformatting structured signals.
  */
 async function generateLLMExplanation(dealer, assessment) {
-  if (!anthropic) return null;
+  if (!llmClient) return null;
 
   const { metrics, signals, defaultProbability } = assessment;
 
@@ -80,8 +79,8 @@ Focus on the most critical signals and what they mean together (not separately).
 End with a recommended action.`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const message = await llmClient.messages.create({
+      model: process.env.LLM_MODEL || 'claude-haiku-4-5-20251001',
       max_tokens: 200,
       messages: [
         {
@@ -131,7 +130,7 @@ async function runRiskAnalysis() {
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'ok',
-    llmAvailable: !!anthropic,
+    llmAvailable: !!llmClient,
     timestamp: new Date().toISOString()
   });
 });

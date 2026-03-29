@@ -9,7 +9,7 @@
 Precision = True Positives / (True Positives + False Positives)
 ```
 
-**Sensitivity (Recall):** Of all dealers who defaulted, what % did we flag?
+**Sensitivity (Recall):** Of all dealers who defaulted, what % did I flag?
 ```
 Recall = True Positives / (True Positives + False Negatives)
 ```
@@ -255,7 +255,7 @@ Classification: False Positive ✓
 
 Lesson: Dealer had stress but recovered via payment.
 System correctly identified stress (TP), but didn't default (FP classification ok).
-This is a "successful flag" – dealer paid because we called them.
+This is a "successful flag" – dealer paid because the ops team called them.
 ```
 
 ### Case 2: Dealer Flagged, No Payment Data Available
@@ -278,7 +278,7 @@ Day 0:  Flagged as WATCH
 Day 30: Defaulted
 
 Did system work?
-→ YES. We flagged correctly (TP).
+→ YES. The system flagged correctly (TP).
 → Ops didn't follow up (operational failure, not system failure).
 
 Lesson: System works; ops needs training/resources to act on flags.
@@ -353,4 +353,4 @@ Even with 50% false positives, ROI is massive. **System pays for itself many tim
 
 The system is designed with **high recall prioritized over precision**. Ops teams expect to review some false positives; the cost of missing a default far exceeds the cost of reviewing a healthy dealer.
 
-After the first 30 days of live data, we'll have real precision/recall numbers and can refine thresholds accordingly. The framework above provides the tools to measure and improve continuously.
+After the first 30 days of live data, I'll have real precision/recall numbers and can refine thresholds accordingly. The framework above provides the tools to measure and improve continuously.

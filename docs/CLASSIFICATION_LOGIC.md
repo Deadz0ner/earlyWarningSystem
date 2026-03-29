@@ -13,10 +13,12 @@ The system classifies dealers into 4 risk tiers based on deterministic threshold
 
 **Criteria (ALL must be true):**
 - DPO: ≤ 50 days
-- Utilization: < 70%
+- Utilization: < 80%
 - Late Payments (90d window): 0 incidents
-- Order Trend: Stable or growing (±10%)
+- Order Trend: Stable or growing (< 10% decline, seasonal-adjusted)
 - Order Volatility: < 15%
+- DPO Velocity: < 10d month-over-month
+- Payment Coverage: > 70% of EMI
 
 **Tier Score:** 5
 
@@ -30,6 +32,8 @@ Dealer_002 (PREMIUM)
 - Late Payments: 0 ✓
 - Orders: ↑ 5% ✓
 - Volatility: 8% ✓
+- DPO Velocity: +2d ✓
+- Payment Coverage: 100% ✓
 → HEALTHY
 ```
 
@@ -38,26 +42,30 @@ Dealer_002 (PREMIUM)
 ### 🟡 WATCH (Tier 2)
 **Status:** Early warning signs. Dealer is manageable but requires attention.
 
-**Criteria (1–2 signals present):**
-- DPO: 51–65 days (creeping above baseline)
-- Utilization: 70–80% (rising leverage)
-- Late Payments (90d window): 1 incident
-- Order Trend: Mild decline (10–20%)
+**Criteria (1–2 signals at WATCH level, no CRITICAL signals):**
+- DPO: 65–89 days (creeping above baseline)
+- Utilization: 80–90% (rising leverage)
+- Late Payments (90d window): 1–2 incidents
+- Order Trend: Mild decline (10–20%, seasonal-adjusted)
 - Order Volatility: 15–25% (moderate inconsistency)
+- DPO Velocity: 10–19d month-over-month jump
+- Payment Coverage: 30–70% of EMI
 
-**Tier Score:** 25
+**Tier Score:** 25+
 
 **Action:** Weekly monitoring, ops review recommended
 
 **Example:**
 ```
 Dealer_023 (GOOD)
-- DPO: 58 days ⚠️
-- Utilization: 74% ⚠️
+- DPO: 58 days ✓
+- Utilization: 74% ✓
 - Late Payments: 0 ✓
-- Orders: ↓ 12% ⚠️
+- Orders: ↓ 12% ⚠️ (seasonal-adjusted)
 - Volatility: 18% ⚠️
-→ WATCH (3 signals)
+- DPO Velocity: +12d ⚠️
+- Payment Coverage: 65% ⚠️
+→ WATCH (score = 15 + 15 + 20 + 20 = 70... but no CRITICAL signal, score ≥ 25)
 ```
 
 ---
@@ -65,26 +73,28 @@ Dealer_023 (GOOD)
 ### 🟠 AT RISK (Tier 3)
 **Status:** Multiple concerning indicators. Intervention recommended.
 
-**Criteria (2+ signals present):**
-- DPO: 66–89 days (approaching critical zone)
+**Criteria (multiple WATCH signals accumulating to score ≥ 60, no CRITICAL signals):**
+- DPO: 65–89 days (approaching critical zone)
 - Utilization: 80–90% (high leverage)
-- Late Payments (90d window): 2+ incidents
-- Order Trend: Significant decline (20–40%)
-- Order Volatility: 25–40% (high inconsistency)
+- Late Payments (90d window): 1–2 incidents
+- Order Trend: Moderate decline (20–40%, seasonal-adjusted)
+- Order Volatility: 15–25%
+- DPO Velocity: 10–19d month-over-month
+- Payment Coverage: 30–70% of EMI
 
-**Tier Score:** 60
+**Tier Score:** 60+
 
 **Action:** Immediate ops review, dealer contact recommended
 
 **Example:**
 ```
 Dealer_045 (FAIR)
-- DPO: 75 days ⚠️⚠️
-- Utilization: 85% ⚠️⚠️
-- Late Payments: 2 ⚠️⚠️
-- Orders: ↓ 25% ⚠️⚠️
-- Volatility: 32% ⚠️⚠️
-→ AT RISK (all signals present)
+- DPO: 75 days ⚠️ (+40)
+- Utilization: 85% ⚠️ (+30)
+- Late Payments: 1 ⚠️ (+20)
+- Orders: ↓ 15% ⚠️ (+25)
+- Volatility: 20% ⚠️ (+15)
+→ AT RISK (score = 130, no single CRITICAL signal)
 ```
 
 ---
@@ -92,26 +102,30 @@ Dealer_045 (FAIR)
 ### 🔴 CRITICAL (Tier 4)
 **Status:** Imminent or actual default. Collection procedures initiated.
 
-**Criteria (1+ critical signal):**
+**Criteria (ANY single CRITICAL signal triggers this tier):**
 - DPO: ≥ 90 days ← **DEFINITION OF DEFAULT**
 - Utilization: > 90% (maxed out)
 - Late Payments (90d window): 3+ incidents
-- Order Trend: Severe decline (> 40%) or near-zero
-- Order Volatility: > 40% (erratic, loss of control)
+- Order Trend: Severe decline (> 40%, seasonal-adjusted)
+- Order Volatility: > 25% (erratic, loss of control)
+- DPO Velocity: ≥ 20d month-over-month jump (emergency signal)
+- Payment Coverage: < 30% of EMI
 
-**Tier Score:** 100
+**Tier Score:** 100+
 
 **Action:** Immediate intervention, collection, possible write-off
 
 **Example:**
 ```
 Dealer_042 (HIGHRISK)
-- DPO: 95 days 🔴🔴🔴
-- Utilization: 94% 🔴🔴🔴
-- Late Payments: 3 🔴🔴🔴
-- Orders: ↓ 50% 🔴🔴🔴
-- Volatility: 48% 🔴🔴🔴
-→ CRITICAL (all signals critical)
+- DPO: 95 days 🔴 (+100)
+- Utilization: 94% 🔴 (+80)
+- Late Payments: 3 🔴 (+70)
+- Orders: ↓ 50% 🔴 (+60)
+- Volatility: 32% 🔴 (+30)
+- DPO Velocity: +22d 🔴 (+50)
+- Payment Coverage: 0% 🔴 (+60)
+→ CRITICAL (multiple CRITICAL signals, score = 450)
 ```
 
 ---
@@ -168,8 +182,9 @@ Dealer_042 (HIGHRISK)
 |-----------------|------|-----------|
 | <15% | Healthy | Consistent orders; dealer has stable customer base |
 | 15–25% | Watch | Moderate swings; dealer may be facing demand uncertainty |
-| 25–40% | At Risk | High swings; dealer struggling to manage working capital |
-| >40% | Critical | Erratic pattern; dealer in distress, lost control |
+| >25% | Critical | Erratic pattern; dealer struggling to manage working capital or in distress |
+
+*Note: Volatility is calculated on seasonal-adjusted order values (each month's orders divided by its seasonal factor) to avoid penalizing natural Q1/Q4 swings.*
 
 ---
 
@@ -177,24 +192,48 @@ Dealer_042 (HIGHRISK)
 
 ### Tier Score Calculation
 
-Each dealer is assigned a **tier score** (0–100) based on signal presence:
+Each dealer is assigned a **tier score** based on which signals fire. The score is the sum of all triggered signal weights:
 
 ```
-Tier Score = Base_Score_for_Tier + Signal_Bonuses
+Signal Weights (from riskEngine.js):
 
-Where:
-- DPO signal present → +30 (if critical: +50)
-- Utilization signal present → +25 (if critical: +40)
-- Late Payment signal present → +20 (if critical: +35)
-- Order Decline signal present → +20 (if critical: +35)
-- Order Volatility signal present → +10 (if critical: +20)
+DPO:
+  CRITICAL (≥90d)      → +100
+  WATCH (65-89d)        → +40
+
+Utilization:
+  CRITICAL (>90%)       → +80
+  WATCH (80-90%)        → +30
+
+Late Payments (90d):
+  CRITICAL (3+)         → +70
+  WATCH (1-2)           → +20
+
+Order Trend (seasonal-adjusted):
+  CRITICAL (>40% decline) → +60
+  AT_RISK (20-40%)        → +15  (note: unique intermediate level)
+  WATCH (10-20%)          → +25
+
+Order Volatility:
+  CRITICAL (>25%)       → +30
+  WATCH (15-25%)        → +15
+
+DPO Velocity (month-over-month):
+  CRITICAL (≥20d jump)  → +50
+  WATCH (10-19d jump)   → +20
+
+Payment Coverage (vs EMI):
+  CRITICAL (<30%)       → +60
+  WATCH (30-70%)        → +20
 ```
 
-**Score Ranges:**
-- 0–10: HEALTHY (score 5)
-- 11–40: WATCH (score 25)
-- 41–80: AT RISK (score 60)
-- 81–100: CRITICAL (score 100)
+**Tier Assignment Rules:**
+- Any single CRITICAL signal → **CRITICAL** tier (regardless of total score)
+- Score ≥ 60 → **AT RISK**
+- Score ≥ 25 → **WATCH**
+- Otherwise → **HEALTHY**
+
+**Confidence adjustment:** If data confidence < 0.5 (fewer than 3 months of history), the tier score is scaled down by the confidence factor to avoid over-flagging new dealers.
 
 ### Top 10 Ranking
 
@@ -218,12 +257,14 @@ A dealer escalates if:
 
 | Trigger | Effect | Example |
 |---------|--------|---------|
-| **New Payment Threshold Hit** | Escalate one tier immediately | DPO hits 65+ → WATCH; DPO hits 90+ → CRITICAL |
-| **DPO Jump >15 days** | Escalate one tier | DPO 50→68 in one month → Watch to At Risk |
-| **DPO Jump >20 days** | Escalate directly to CRITICAL | DPO 55→78 in one month → Critical |
-| **2+ New Late Payments** | Escalate one tier | 0 lates → 2+ lates → escalate |
-| **Order Cliff >30%** | Escalate one tier | Orders drop 35% MoM → escalate |
-| **Velocity Breach** | Escalate directly to CRITICAL | DPO increasing by >10d/month × 3 months → Critical |
+| **DPO ≥ 90 days** | Direct to CRITICAL | DPO hits 90+ → CRITICAL (RBI NPA definition) |
+| **DPO Jump ≥ 20 days** | Direct to CRITICAL | DPO 55→78 in one month → CRITICAL (dpoVelocity signal) |
+| **DPO Jump 10–19 days** | WATCH-level signal (+20) | DPO 50→62 in one month → contributes to score |
+| **Payment Coverage < 30%** | Direct to CRITICAL | Paying < 30% of EMI → CRITICAL |
+| **Late Payments 3+** | Direct to CRITICAL | 3+ late incidents in 90d → CRITICAL |
+| **Order Decline > 40%** | Direct to CRITICAL | Seasonal-adjusted orders collapse → CRITICAL |
+| **Utilization > 90%** | Direct to CRITICAL | Maxed out credit → CRITICAL |
+| **Order Volatility > 25%** | Direct to CRITICAL | Erratic order patterns → CRITICAL |
 
 ### De-escalation Rules (Dealer Moves Down in Tier)
 
@@ -253,27 +294,37 @@ Month 8–12:  DEFAULT (90+ DPO maintained)
 The classification is implemented in `src/engine/riskEngine.js`:
 
 ```javascript
-function classifyDealerTier(currentMetrics, historicalMetrics) {
-  // 1. Evaluate each signal independently
+function classifyDealerTier(metrics) {
+  // 1. Evaluate each of the 7 signals independently
   const signals = {
-    dpo: evaluateDPO(currentMetrics.daysPayableOutstanding),
-    utilization: evaluateUtilization(currentMetrics.utilization),
-    latePayments: evaluateLatePayments(currentMetrics.latePaymentCount),
-    orderTrend: evaluateOrderTrend(historicalMetrics.orderDeclinePercent),
-    volatility: evaluateVolatility(historicalMetrics.orderVolatility)
+    dpo: null,           // Days Payable Outstanding
+    utilization: null,    // Loan utilization rate
+    latePayments: null,   // Late payment count (90d)
+    orderTrend: null,     // Seasonal-adjusted order decline
+    volatility: null,     // Order volatility (CV)
+    dpoVelocity: null,    // Month-over-month DPO change
+    paymentCoverage: null  // Payment received vs expected EMI
   };
 
-  // 2. Aggregate signal counts and severity
-  let tier = HEALTHY;
+  // 2. Each signal adds to tierScore based on severity
   let tierScore = 0;
+  // e.g., if DPO >= 90: signals.dpo = "CRITICAL", tierScore += 100
+  // e.g., if utilization >= 0.9: signals.utilization = "CRITICAL", tierScore += 80
 
-  // 3. Apply escalation rules
-  if (signals.dpo === CRITICAL || signals.utilization === CRITICAL) {
-    tier = CRITICAL;
+  // 3. Confidence adjustment for sparse data
+  if (metrics.confidence < 0.5) {
+    tierScore = Math.round(tierScore * metrics.confidence);
+  }
+
+  // 4. Any single CRITICAL signal → CRITICAL tier
+  if (signals.dpo === 'CRITICAL' || signals.utilization === 'CRITICAL' ||
+      signals.latePayments === 'CRITICAL' || signals.orderTrend === 'CRITICAL' ||
+      signals.dpoVelocity === 'CRITICAL' || signals.paymentCoverage === 'CRITICAL') {
+    tier = 'CRITICAL';
   } else if (tierScore >= 60) {
-    tier = AT_RISK;
+    tier = 'AT_RISK';
   } else if (tierScore >= 25) {
-    tier = WATCH;
+    tier = 'WATCH';
   }
 
   return { tier, tierScore, signals };
@@ -312,15 +363,18 @@ function classifyDealerTier(currentMetrics, historicalMetrics) {
 
 ## Summary Table
 
-| Metric | Healthy | Watch | At Risk | Critical |
-|--------|---------|-------|---------|----------|
-| **DPO (days)** | ≤50 | 51–65 | 66–89 | ≥90 |
-| **Utilization** | <70% | 70–80% | 80–90% | >90% |
-| **Late Payments (90d)** | 0 | 1 | 2 | 3+ |
-| **Order Decline** | ±10% | 10–20% | 20–40% | >40% |
-| **Volatility** | <15% | 15–25% | 25–40% | >40% |
-| **Tier Score** | 5 | 25 | 60 | 100 |
-| **Action** | Monitor Quarterly | Monitor Weekly | Immediate Review | Collection |
+| Metric | Healthy | Watch | Critical |
+|--------|---------|-------|----------|
+| **DPO (days)** | ≤50 | 65–89 | ≥90 |
+| **Utilization** | <80% | 80–90% | >90% |
+| **Late Payments (90d)** | 0 | 1–2 | 3+ |
+| **Order Decline (seasonal-adj)** | <10% | 10–40% | >40% |
+| **Volatility (seasonal-adj)** | <15% | 15–25% | >25% |
+| **DPO Velocity (MoM)** | <10d | 10–19d | ≥20d |
+| **Payment Coverage (vs EMI)** | >70% | 30–70% | <30% |
+| **Action** | Monitor Quarterly | Monitor Weekly | Collection |
+
+*Note: AT RISK tier is determined by accumulated score (≥60) from multiple WATCH-level signals, not by its own threshold band. Any single CRITICAL signal bypasses scoring and assigns CRITICAL tier directly.*
 
 ---
 

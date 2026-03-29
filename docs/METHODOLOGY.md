@@ -1,6 +1,6 @@
 # Methodology: AI vs. Deterministic Decision Matrix
 
-This document details where and why we use AI (Claude API) versus deterministic rules in the early warning engine.
+This document details where and why I use AI (LLM API) versus deterministic rules in the early warning engine.
 
 ---
 
@@ -53,8 +53,10 @@ This document details where and why we use AI (Claude API) versus deterministic 
 | DPO High | `daysPayableOutstanding >= 90` | Hard threshold | RBI compliance definition |
 | Utilization High | `utilization > 0.90` | Hard threshold | Accounting standard |
 | Late Payments | `count >= 3` (in 90d) | Hard threshold | Objective transaction count |
-| Order Decline | `decline_percent > 0.40` | Hard threshold | Clear business contraction |
-| Volatility High | `volatility_coeff > 0.40` | Hard threshold | Statistical threshold |
+| Order Decline | `seasonalAdjustedDecline > 0.40` | Hard threshold | Clear business contraction |
+| Volatility High | `volatility_coeff > 0.25` | Hard threshold | Statistical threshold |
+| DPO Velocity | `dpoVelocity >= 20` (MoM) | Hard threshold | Rapid deterioration signal |
+| Payment Coverage | `paymentCoverage < 0.30` | Hard threshold | Direct EMI underpayment |
 
 **Rationale:** Threshold-based classification is:
 - ✅ Transparent (ops teams understand "if DPO > 90d, then critical")
@@ -131,20 +133,39 @@ function generateExplanation(assessment) {
 
 #### 4B. LLM-Enhanced Narrative (30%) ⭐ **Active**
 
-**Method:** Claude API to synthesize dry facts into actionable context.
+**Method:** LLM API call to synthesize dry facts into actionable context.
 
-**Prompt Template:**
+**Prompt Template** (from `src/api/server.js`):
 ```
-You are a financial analyst. Here are structured risk signals for a dealer:
-- Dealer: Dealer_042
-- DPO: 95 days (CRITICAL)
-- Utilization: 92% (CRITICAL)
-- Order Decline: 45% (CRITICAL)
-- Profile: HIGHRISK
+You are a financial risk analyst for an NBFC (non-banking financial company).
+Analyze this dealer's financial signals and provide a brief, actionable explanation for ops teams.
 
-Generate a brief (2–3 sentence), actionable explanation for ops teams deciding whether to call this dealer.
-Focus on: (1) Most critical signal, (2) Why it matters, (3) Recommended action.
-Tone: Professional, urgent but not alarmist.
+Dealer: Dealer_042
+Profile: HIGHRISK
+Sanctioned Limit: ₹3.2L
+30-Day Default Probability: 87.2%
+
+Current Metrics:
+- Days Payable Outstanding: 95 days
+- DPO Velocity (month-over-month): +22 days
+- Loan Utilization: 91.9%
+- Recent Order Value: ₹42000
+- Payments This Month: ₹0
+- Payment Coverage (vs EMI): 0%
+- Order Decline (seasonal-adjusted): 45.0%
+
+Risk Signals:
+- DPO Status: CRITICAL
+- DPO Velocity: CRITICAL
+- Utilization Status: CRITICAL
+- Late Payment Status: CRITICAL
+- Payment Coverage: CRITICAL
+- Order Trend: CRITICAL
+- Order Volatility: CRITICAL
+
+Provide a 2-3 sentence explanation suitable for an operations team deciding whether to call this dealer.
+Focus on the most critical signals and what they mean together (not separately).
+End with a recommended action.
 ```
 
 **Example LLM Output:**
@@ -161,10 +182,12 @@ escalate to collections."
 ✅ **Language:** Converts technical metrics to natural language ops prefer
 ✅ **Tone:** Adjusts urgency based on context (CRITICAL vs. WATCH)
 
+**Scope:** LLM explanations are only generated for **CRITICAL** and **AT_RISK** dealers (typically 5–15 out of 100). HEALTHY and WATCH dealers use deterministic explanations only.
+
 **Cost/Benefit:**
-- **Cost:** API latency (100–500ms per dealer, ~50–500s for 100 dealers)
+- **Cost:** API latency (100–500ms per dealer, ~1–8s for 5–15 flagged dealers)
 - **Benefit:** Operators report better decision-making with context
-- **Fallback:** If API fails, system still works with deterministic explanations
+- **Fallback:** If API fails or no API key is set, system still works with deterministic explanations
 
 ---
 
@@ -207,7 +230,7 @@ async function detectAnomalies(dealer, historicalData) {
     Answer: [yes/no + reasoning]
   `;
 
-  const response = await claude.messages.create({ /* ... */ });
+  const response = await llm.messages.create({ /* ... */ });
   return response.content[0].text;
 }
 ```
@@ -249,7 +272,7 @@ async function detectAnomalies(dealer, historicalData) {
 - **RBI guidelines** for NBFCs require traceable, documented default risk logic
 - **ML model:** Hard to audit ("how did you decide 0.87 is high risk?")
 - **Deterministic rules:** Easy to audit ("if DPO > 90d, that's default per RBI guidelines")
-- **Decision:** Stay deterministic until we can fully explain ML logic
+- **Decision:** Stay deterministic until I can fully explain ML logic
 
 ---
 
@@ -284,7 +307,7 @@ Which is correct?
 | Risk Scoring | ✅ | | Transparency; auditability |
 | Tier Assignment | ✅ | | Consistency; reproducibility |
 | **Explanation Text** | ⚠️ Baseline | ✅ Enhanced | LLM adds context without changing score |
-| Anomaly Detection | | ✅ Future | Once we have validation data |
+| Anomaly Detection | | ✅ Future | Once I have validation data |
 | Default Prediction | | ✅ Future | After 6–12 months of live defaults |
 
 ---
@@ -353,7 +376,7 @@ Keep SHAP explanations for interpretability
 ## Key Principles
 
 ### 1. **Transparency First**
-All outputs must be explainable. If ops asks "why was this dealer flagged?", we must point to specific data.
+All outputs must be explainable. If ops asks "why was this dealer flagged?", I must be able to point to specific data.
 
 ### 2. **Data-Driven Thresholds**
 Thresholds come from domain knowledge (RBI guidelines) + statistical analysis, not arbitrary gut feel.

@@ -27,7 +27,7 @@ CREATE TABLE dealers (
 - **profile:** Credit profile (PREMIUM, GOOD, FAIR, HIGHRISK)
 - **sanctionedLimit:** Sanctioned loan limit in INR (₹15L–₹60L)
 - **baselineDPO:** Typical Days Payable Outstanding for this dealer (25–70 days)
-- **defaultRisk:** Annual default probability (0.005–0.25)
+- **defaultRisk:** Annual default probability (0.01–0.25)
 - **createdAt:** Account opening date (fixed: 2025-01-01)
 
 ---
@@ -98,20 +98,25 @@ Latest risk assessment for each dealer (updated after each analysis run).
 ```sql
 CREATE TABLE risk_assessments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  dealerId INTEGER NOT NULL,
+  dealerId INTEGER NOT NULL UNIQUE,
   dealerName TEXT NOT NULL,
   anchorId TEXT NOT NULL,
   profile TEXT NOT NULL,
   tier TEXT NOT NULL,
   tierScore INTEGER NOT NULL,
-  defaultProbability FLOAT NOT NULL,
+  defaultProbability REAL DEFAULT 0,
   metrics TEXT NOT NULL,        -- JSON
   signals TEXT NOT NULL,        -- JSON
   explanation TEXT,
+  llmExplanation TEXT,
   analyzedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (dealerId) REFERENCES dealers(id)
 )
 ```
+
+**Notes:**
+- `dealerId` has a `UNIQUE` constraint — re-running analysis uses `INSERT OR REPLACE` (upsert) to update existing rows rather than creating duplicates.
+- `llmExplanation` stores the LLM-generated narrative separately from the deterministic `explanation`.
 
 ---
 
@@ -129,44 +134,15 @@ DPO = (Accounts Payable / Cost of Goods Sold) × Days in Period = (unpaid amount
 
 _Simplified in synthetic data: modeled as distribution per dealer with seasonal & deterioration factors_
 
-**Interpretation:**
-
-- **25–35 days:** Normal, premium dealers
-- **35–50 days:** Acceptable, typical range
-- **50–70 days:** Concerning, early warning
-- **70–90 days:** High risk, escalate
-- **90+ days:** DEFAULT, intervention required
-
-**Why Track:**
-
-- Earliest indicator of cash flow stress
-- Before payment is missed entirely, DPO extends
-- Monthly metric = high frequency for early detection
+**Why Track:** Earliest indicator of cash flow stress. Before payment is missed entirely, DPO extends. Monthly metric = high frequency for early detection. RBI defines 90+ days as NPA (Non-Performing Asset).
 
 ---
 
 ### 2. Utilization Rate
 
-**Definition:** Percentage of sanctioned limit currently drawn.
+**Definition:** Percentage of sanctioned limit currently drawn. `Utilization = Current Balance / Sanctioned Limit`
 
-**Calculation:**
-
-```
-Utilization = Current Balance / Sanctioned Limit
-```
-
-**Interpretation:**
-
-- **<70%:** Healthy, normal working capital usage
-- **70–80%:** Rising leverage, monitor
-- **80–90%:** High leverage, dealer may be over-extended
-- **>90%:** Critical, dealer maxed out on credit
-
-**Why Track:**
-
-- Concentration risk (if dealer defaults, NBFC loses X% of portfolio)
-- Stress indicator (dealers draw more as business deteriorates)
-- Constraint signal (dealer can't adjust drawdown if needed)
+**Why Track:** Concentration risk (if dealer defaults, NBFC exposure = utilization % of limit). Stress indicator — dealers draw more as business deteriorates. Constraint signal — high utilization means no buffer for emergencies.
 
 ---
 
@@ -174,75 +150,32 @@ Utilization = Current Balance / Sanctioned Limit
 
 **Definition:** Volume and value of purchase orders placed by dealer.
 
-**Calculation:**
+**Calculations:**
+- `Monthly Order Value = Sum of all order invoices`
+- `Average Order Value = Total Order Value / Order Count`
+- `Order Volatility = Std Dev of last 6 months (seasonal-adjusted) / Mean`
 
-```
-Monthly Order Value = Sum of all order invoices
-Average Order Value = Total Order Value / Order Count
-Order Volatility = Std Dev of last 6 months / Mean
-```
-
-**Interpretation (Month-over-Month Decline):**
-
-- **0–10%:** Healthy, normal variation
-- **10–20%:** Slight decline, monitor seasonality
-- **20–40%:** Significant decline, watch trend
-- **>40%:** Severe collapse, critical signal
-
-**Why Track:**
-
-- Orders = proxy for dealer's retail demand
-- Declining orders → losing customers or losing to competitors
-- Sudden drop → unexpected shock (job loss, lockdown, supplier switch)
-- Before default, business activity falls _first_
+**Why Track:** Orders are a proxy for retail demand. Declining orders precede payment stress. Volatility suggests unstable cash flows.
 
 ---
 
-### 4. Payment Consistency (Trend)
+### 4. Payment Consistency (DPO Trend & Velocity)
 
 **Definition:** Month-over-month change in DPO.
 
-**Interpretation:**
-
-- **DPO ↓:** Improving; dealer paying faster
-- **DPO →:** Stable; consistent behavior
-- **DPO ↑:** Worsening; dealer paying slower (early stress signal)
-
-**Critical Thresholds:**
-
-- DPO increase >15 days in one month → escalate risk tier
-- DPO jump >20 days in one month → escalate directly to CRITICAL
-
-**Why Track:**
-
-- Trend is stronger signal than point-in-time metric
-- Velocity (rate of change) matters: DPO 60→65 is different from 50→75
-- Catches emerging stress before hitting hard threshold
+**Why Track:** Trend is a stronger signal than point-in-time DPO. Velocity (rate of change) matters: DPO 60→65 is very different from 50→75. Catches emerging stress before hitting hard thresholds.
 
 ---
 
 ### 5. Late Payment Incidents
 
-**Definition:** Count of months where payment arrived after expected date.
+**Definition:** Count of months with late payments, tracked over a 90-day rolling window.
 
-**Tracked Over:**
+**Why Track:** Hard evidence of payment failure (not just slowdown). Patterns indicate systemic problems vs. one-time delays.
 
-- 30-day window (current month)
-- 90-day window (last 3 months)
-- 180-day window (last 6 months)
+---
 
-**Interpretation:**
-
-- **0 incidents:** Reliable payer
-- **1 incident (90d):** Minor slip, watch
-- **2 incidents (90d):** Concerning pattern emerging
-- **3+ incidents (90d):** High risk, likely systemic issue
-
-**Why Track:**
-
-- Hard evidence of payment failure (not just slowdown)
-- Patterns indicate systemic problem vs. one-time delay
-- Repeated lates = behavioral signal of financial stress
+For the exact thresholds that map these metrics to risk tiers (HEALTHY/WATCH/AT_RISK/CRITICAL), see [CLASSIFICATION_LOGIC.md](CLASSIFICATION_LOGIC.md).
 
 ---
 
@@ -263,43 +196,67 @@ This is modeled into each dealer's order values and utilization rates.
 
 ---
 
-### Deterioration Trajectories
+### Behavioral Archetypes
 
-Three types of dealers modeled:
+Five archetypes are assigned once per dealer at creation and govern all 12 months of transaction data:
 
-**1. Healthy Throughout (60% of portfolio)**
+**1. Stable (55% of portfolio)**
 
-- Stable DPO (within ±5 days)
-- Consistent orders (month-to-month variance <10%)
-- 0 late payments
-- No default risk
+- Consistent behavior throughout the year
+- DPO stays near baseline (±5 days)
+- Orders follow normal seasonal patterns
+- 0 late payments, no default risk
 
 **2. Slow Deterioration (15% of portfolio)**
 
-- Months 1–4: Healthy baseline
-- Months 5–8: DPO +10d/month, orders ↓5% per month
-- Months 9–12: Approaching critical (DPO 70–85d, orders ↓30%)
-- High likelihood of default in month 12
+- Months 1–3: Healthy baseline
+- Months 4–8: Gradual decline (trend factor drops from 1.0 to ~0.6)
+- Months 9–11: Approaching critical (DPO rises via 1.0 + (month-5)*0.12 factor)
+- Months 10–11: Probabilistic default trigger (based on `defaultRisk * 3`)
 
-**3. Sudden Stress (5% of portfolio)**
+**3. Recovery (8% of portfolio)**
 
-- Months 1–8: Healthy
-- Month 9: Sharp shock (DPO jump +25d, orders ↓40%)
-- Months 10–12: Attempts recovery or defaults
-- Simulates unexpected event (job loss, major customer loss)
+- Months 1–2: Normal operations
+- Months 3–6: V-shaped dip (trend factor drops to ~0.65)
+- Months 7–11: Gradual recovery (trend factor climbs back toward 1.0)
+- Simulates dealers that experience temporary stress but bounce back
+
+**4. Sudden Stress (7% of portfolio)**
+
+- Months 1–8: Normal operations (trend factor 1.0)
+- Months 9–11: Sharp cliff (trend factor drops to 0.4–0.5)
+- DPO factor spikes to 1.3+ in last 3 months
+- Months 10–11: Probabilistic default trigger (based on `defaultRisk * 4`)
+
+**5. Seasonal Volatile (15% of portfolio)**
+
+- Exaggerated seasonal swings but mean-reverting
+- Q1 dips harder (0.75–0.85), Q4 spikes higher (1.1–1.2)
+- Fundamentally healthy — no default trajectory
+- Can trigger false positives during low-season months
+
+**Profile-Archetype Interaction:**
+- HIGHRISK dealers have a 40% chance of being reassigned to SLOW_DETERIORATION
+- PREMIUM dealers with SLOW_DETERIORATION are rerolled to STABLE (70%) or SEASONAL_VOLATILE (30%)
 
 ---
 
 ### Default Simulation
 
-2% of dealers (2/100) are assigned to default by month 12:
+Defaults are **probabilistic**, not pre-assigned. Whether a dealer defaults depends on their archetype and profile:
 
-- **Default month:** Last 2–3 months (high-risk dealers)
-- **Signals:**
-  - Payment stops (paymentReceived = 0)
-  - Orders collapse (totalOrderValue → 0)
-  - DPO hits 95+ days (exceeds 90d threshold)
-  - Multiple late payment incidents
+- **SLOW_DETERIORATION** dealers: In months 10–11, default triggers with probability `defaultRisk * 3`
+- **SUDDEN_STRESS** dealers: In months 10–11, default triggers with probability `defaultRisk * 4`
+- **Other archetypes**: Very rare random defaults in months 9+ with probability `defaultRisk * 0.3`
+- **Anchor B** dealers have 30% higher `defaultRisk` than Anchor A
+
+**When default triggers:**
+- Payment stops (`paymentReceived = 0`)
+- Orders near-collapse (5–10% of normal)
+- DPO spikes via 1.8–2.2x factor (capped at 95 days)
+- Multiple late payment incidents
+
+**Expected defaults:** Varies per run due to randomness, but typically 2–5 dealers out of 100.
 
 **Ground Truth:** Used to measure false positive rate during evaluation.
 
@@ -348,14 +305,14 @@ volatility = StdDev(last_6_months_orders) / Mean(last_6_months_orders)
 
 ## Data Quality Assumptions
 
-### What We Assume is Always Available
+### What I Assume is Always Available
 
 - Monthly transaction data (no gaps)
 - Payment amounts
 - Sanctioned limits (fixed per dealer)
 - Order data
 
-### What We Assume is Clean
+### What I Assume is Clean
 
 - Order dates, amounts, quantities are accurate
 - Payments are correctly recorded (no reversals)
@@ -396,4 +353,4 @@ volatility = StdDev(last_6_months_orders) / Mean(last_6_months_orders)
 ### Extensibility
 
 - Easy to add more metrics later (cash conversion cycle, inventory turns, etc.)
-- Foundation for ML models once we have default history
+- Foundation for ML models once I have default history

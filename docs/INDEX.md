@@ -35,7 +35,8 @@ This file maps each submission requirement from the problem statement to the doc
 
 | Document | What it covers |
 |----------|---------------|
-| [DATA_MODEL.md](DATA_MODEL.md) | **Primary.** Edge case handling table (new dealers, missing payments, zero orders, no transactions). Data quality assumptions. |
+| [MISSING_DATA.md](MISSING_DATA.md) | **Primary.** Confidence scoring mechanism, UNKNOWN tier for new dealers, minimum data requirements per metric, missing data flags, null-safe signal evaluation, zero-EMI edge case, how default probability handles gaps. |
+| [DATA_MODEL.md](DATA_MODEL.md) | The schema-level view — which fields exist, data quality assumptions. |
 
 ---
 

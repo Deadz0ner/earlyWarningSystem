@@ -122,7 +122,7 @@ Each submission requirement is covered in a dedicated document. See [docs/INDEX.
 | What data points I chose to monitor and why | [CHOSEN_DATAPOINTS.md](docs/CHOSEN_DATAPOINTS.md) |
 | Risk classification logic, thresholds, triggers | [CLASSIFICATION_LOGIC.md](docs/CLASSIFICATION_LOGIC.md) |
 | Where I used AI vs deterministic rules, and reasoning | [METHODOLOGY.md](docs/METHODOLOGY.md) |
-| What happens when data is missing | [DATA_MODEL.md](docs/DATA_MODEL.md) |
+| What happens when data is missing | [MISSING_DATA.md](docs/MISSING_DATA.md) |
 | False positive rate and measurement | [FALSE_POSITIVES.md](docs/FALSE_POSITIVES.md) |
 | What I would improve with more time | [FUTURE_WORK.md](docs/FUTURE_WORK.md) |
 | Database schema and metric definitions | [DATA_MODEL.md](docs/DATA_MODEL.md) |
@@ -183,6 +183,7 @@ Each submission requirement is covered in a dedicated document. See [docs/INDEX.
     ├── CLASSIFICATION_LOGIC.md         # Risk tiers, thresholds, scoring
     ├── METHODOLOGY.md                  # AI vs deterministic decision matrix
     ├── SAMPLE_OUTPUT.md                # Example dashboard output & API responses
+    ├── MISSING_DATA.md                 # How missing/sparse data is handled
     ├── FALSE_POSITIVES.md              # Measurement framework & refinement
     └── FUTURE_WORK.md                  # Roadmap for improvements
 ```

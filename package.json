@@ -1,0 +1,28 @@
+{
+  "name": "dealer-portfolio-early-warning-system",
+  "version": "1.0.0",
+  "description": "Early warning system for NBFC dealer portfolio risk detection",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "build:frontend": "cd frontend && npm run build",
+    "dev:frontend": "cd frontend && npm run dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nbfc",
+    "dealer",
+    "risk",
+    "early-warning"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "sqlite3": "^6.0.1"
+  }
+}

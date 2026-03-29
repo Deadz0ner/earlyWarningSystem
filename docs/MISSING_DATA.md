@@ -47,12 +47,12 @@ Not all metrics need the same amount of history. The system calculates what it c
 | Utilization | 1 | Uses the single available month |
 | Late payment count (90d) | 1 | Counts from whatever months exist |
 | Payment coverage | 1 | Compares current month's payment vs EMI |
-| DPO velocity (MoM change) | 2 | Defaults to 0 (no month-over-month comparison possible) |
-| Order decline (baseline vs recent) | 4 | Defaults to 0 (not enough history for baseline) |
-| DPO trend (baseline vs recent) | 4 | Defaults to 0 |
+| DPO velocity (MoM change) | 2 | Returns `null` until a prior month exists |
+| Order decline (baseline vs recent) | 4 | Returns `null` until enough baseline history exists |
+| DPO trend (baseline vs recent) | 4 | Returns `null` |
 | Order volatility | 1+ (uses up to 6) | Calculated on whatever is available, but flagged as unreliable below 6 months |
 
-This means a dealer with just 1-2 months of data can still be evaluated on DPO, utilization, late payments, and payment coverage — they just can't be evaluated on trends, velocity, or volatility.
+This means a dealer with just 1-2 months of data can still be evaluated on DPO, utilization, late payments, and payment coverage — trend metrics that need more history remain unavailable instead of being silently treated as zero.
 
 ---
 

@@ -46,7 +46,7 @@ app.use(express.static(path.join(__dirname, '../../public')));
 async function generateLLMExplanation(dealer, assessment) {
   if (!llmClient) return null;
 
-  const { metrics, signals, defaultProbability } = assessment;
+  const { metrics, signals, defaultProbability, interactionFlags } = assessment;
 
   const prompt = `You are a financial risk analyst for an NBFC (non-banking financial company).
 Analyze this dealer's financial signals and provide a brief, actionable explanation for ops teams.
@@ -73,7 +73,7 @@ Risk Signals:
 - Payment Coverage: ${signals.paymentCoverage || 'N/A'}
 - Order Trend: ${signals.orderTrend || 'N/A'}
 - Order Volatility: ${signals.volatility || 'N/A'}
-
+${interactionFlags && interactionFlags.length > 0 ? `\nCompounding Risk Interactions:\n${interactionFlags.map((f) => `- ${f.description}`).join('\n')}` : ''}
 Provide a 2-3 sentence explanation suitable for an operations team deciding whether to call this dealer.
 Focus on the most critical signals and what they mean together (not separately).
 End with a recommended action.`;

@@ -9,6 +9,7 @@ This document explains where and why I use AI (LLM API) versus deterministic rul
 ```
 Data Input → Calculate Metrics (deterministic)
   → Risk Scoring (deterministic)
+  → Signal Interaction Escalation (deterministic)
   → Tier Classification & Ranking (deterministic)
   → Generate Explanations (rule-based + LLM-enhanced)
   → Output: Top 10 Dealers + Explanations
@@ -29,7 +30,7 @@ Each of the 7 signals is checked against hard thresholds (e.g., `DPO >= 90` → 
 - No black box
 
 ### Scoring & Tier Assignment — 100% deterministic
-Signal weights get summed, tier gets assigned from the score. Ranking uses 30-day default probability from a weighted logistic formula. All reproducible, all transparent.
+Signal weights get summed, tier gets assigned from the score. After individual signals are scored, an **interaction escalation layer** checks for dangerous signal combinations (e.g., high utilization + declining orders) and applies bonus score points or tier floors. This captures compounding risk that independent signals miss, while remaining fully rule-based and auditable. See [CLASSIFICATION_LOGIC.md](CLASSIFICATION_LOGIC.md) for the specific interaction rules. Ranking uses 30-day default probability from a weighted logistic formula. All reproducible, all transparent.
 
 ### 30-Day Default Probability — deterministic formula (not ML)
 With only 100 synthetic dealers and ~2-5 actual defaults, there's nowhere near enough labeled data to train an ML model. So I use a weighted logistic formula with domain priors (DPO proximity to 90d gets the heaviest weight, then payment coverage, then velocity, etc.). Once 6+ months of live data with real defaults exist, this can be replaced with a trained logistic regression.

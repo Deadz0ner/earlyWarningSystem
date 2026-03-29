@@ -92,11 +92,18 @@ We are saying:
 
 ---
 
-### 7. Behavioral Anomalies
+### 7. Behavioral Anomalies & Signal Interactions
 
 | What | Unusual metric combinations that don't fit normal patterns                                                                                                                                                                                                                 |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Why  | Some risk signals only emerge in combination. A dealer with steady orders but a sudden 45-day DPO jump may be diverting cash flow. Payments arriving but zero orders may indicate non-anchor activity. These anomalies are hard to catch with individual thresholds alone. |
+
+The system now explicitly checks for three high-conviction signal interactions after individual signals are classified:
+- **High utilization + declining orders** — dealer is heavily drawn on credit while business demand is weakening
+- **Worsening DPO + declining orders** — both repayment behavior and business health are deteriorating together
+- **Low payment coverage + repeated late payments** — active cash crisis, not just administrative delays
+
+These interactions add bonus score points and can impose minimum tier floors (e.g., forcing at least AT_RISK). See [CLASSIFICATION_LOGIC.md](CLASSIFICATION_LOGIC.md) for full details.
 
 ---
 
@@ -146,7 +153,7 @@ DPO proximity carries the highest weight because it's closest to the regulatory 
 
 ## Tier Classification
 
-These data points map to four risk tiers (HEALTHY / WATCH / AT_RISK / CRITICAL) via deterministic thresholds. Any single CRITICAL signal triggers CRITICAL tier immediately. The system optimizes for **high recall** over precision, because missing a real default is far more costly than investigating a false alarm.
+These data points map to four risk tiers (HEALTHY / WATCH / AT_RISK / CRITICAL) via deterministic thresholds. Any single CRITICAL signal triggers CRITICAL tier immediately. After individual signals are scored, an interaction escalation layer checks for dangerous combinations (e.g., high utilization + declining orders) and can boost the tier score or impose a minimum tier floor. The system optimizes for **high recall** over precision, because missing a real default is far more costly than investigating a false alarm.
 
 For the complete threshold table, scoring weights, and escalation rules, see [CLASSIFICATION_LOGIC.md](CLASSIFICATION_LOGIC.md).
 

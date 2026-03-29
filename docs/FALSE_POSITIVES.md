@@ -77,6 +77,7 @@ Flagging too many healthy dealers.
 2. Increase order decline thresholds
 3. Reduce volatility weight
 4. Add "debounce" — require 2 consecutive months above threshold before escalating
+5. Review signal interaction score boosts — the interaction escalation layer adds bonus points when signals co-occur (e.g., +25 for utilization + order stress); if this is pushing too many dealers from WATCH to AT_RISK, reduce the boost values
 
 ### If Recall Is Too Low (< 70%)
 

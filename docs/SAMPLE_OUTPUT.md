@@ -40,6 +40,11 @@ Risk Signals:
   Late Payments: CRITICAL | Payment Coverage: CRITICAL
   Order Trend: CRITICAL | Order Volatility: CRITICAL
 
+Signal Interactions:
+  UTILIZATION_ORDER_STRESS: High credit utilization combined with declining order volume
+  DPO_ORDER_DETERIORATION: Payment delays worsening alongside declining business activity
+  PAYMENT_STRESS: Underpaying EMI and making late payments — active cash crisis
+
 Explanation:
   CRITICAL: Dealer_042 is showing severe distress.
   • DPO is 95 days (threshold: 90d)
@@ -47,6 +52,9 @@ Explanation:
   • Orders dropped 45% (seasonal-adjusted)
   • 3 late payments in last 3 months
   • Paying 0% of expected EMI
+  • Compounding risk: High credit utilization combined with declining order volume;
+    Payment delays worsening alongside declining business activity;
+    Underpaying EMI and making late payments — active cash crisis.
 
 AI Analysis:
   "Dealer_042 faces critical distress: 95-day payment overdue, loan maxed at 92%,
@@ -93,6 +101,11 @@ Top 10 sorted by `defaultProbability` (descending), then `tierScore` as tiebreak
         "dpoVelocity": "CRITICAL",
         "paymentCoverage": "CRITICAL"
       },
+      "interactionFlags": [
+        { "rule": "UTILIZATION_ORDER_STRESS", "description": "High credit utilization combined with declining order volume", "scoreBoost": 25, "floor": "AT_RISK" },
+        { "rule": "DPO_ORDER_DETERIORATION", "description": "Payment delays worsening alongside declining business activity", "scoreBoost": 20, "floor": null },
+        { "rule": "PAYMENT_STRESS", "description": "Underpaying EMI and making late payments — active cash crisis", "scoreBoost": 25, "floor": "AT_RISK" }
+      ],
       "explanation": "CRITICAL: Dealer_042 is showing severe distress signals. ...",
       "llmExplanation": "Dealer_042 faces critical distress: 95-day payment overdue..."
     }

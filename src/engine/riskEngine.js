@@ -100,8 +100,10 @@ function calculateMetrics(transactions) {
 
   // --- Seasonal-adjusted order decline ---
   // Compare same-season-adjusted values to avoid penalizing natural Q1 dips vs Q4 highs
-  let orderDeclinePercent = 0;
-  let seasonalAdjustedOrderDecline = 0;
+  // Keep trend metrics null until we have enough history to calculate them.
+  // This lets downstream logic distinguish "no decline" from "decline unavailable".
+  let orderDeclinePercent = null;
+  let seasonalAdjustedOrderDecline = null;
 
   if (monthsAvailable >= 4) {
     // Use months 2-4 as baseline (enough history, not the very first month)
@@ -153,8 +155,8 @@ function calculateMetrics(transactions) {
     avgAdjustedOrder > 0 ? Math.sqrt(variance) / avgAdjustedOrder : 0;
 
   // --- DPO trend and velocity ---
-  let dpoDiff = 0;
-  let dpoVelocity = 0;
+  let dpoDiff = null;
+  let dpoVelocity = null;
 
   if (monthsAvailable >= 4) {
     const baselineDPO =
@@ -347,6 +349,99 @@ function classifyDealerTier(metrics) {
 }
 
 /**
+ * Check for risky signal combinations that are worse than the sum of parts.
+ *
+ * WHY THIS EXISTS:
+ *   Individual signals are independent — a dealer at WATCH on utilization and
+ *   WATCH on order decline gets scored separately. But the *combination* of
+ *   "heavily drawn credit + shrinking business" is qualitatively more dangerous
+ *   than either alone: the dealer can't grow out of their debt. This layer
+ *   catches those compounding patterns and escalates appropriately.
+ *
+ * DESIGN:
+ *   - Runs after individual signal classification, before final tier assignment.
+ *   - Each rule adds bonus score points and/or imposes a minimum tier floor.
+ *   - Only fires when BOTH sides of the combination are at WATCH level or worse.
+ *   - Returns an interactionFlags array for transparency in output/explanations.
+ */
+function applyInteractionEscalation(classification, metrics) {
+  const { signals } = classification;
+  let { tier, tierScore } = classification;
+  const interactionFlags = [];
+
+  const isWatchOrWorse = (signal) =>
+    signal === "WATCH" || signal === "AT_RISK" || signal === "CRITICAL";
+
+  // --- 1. High utilization + declining orders ---
+  // Dealer is heavily drawn on credit while business demand is weakening.
+  // They can't generate enough revenue to service the debt they've already taken.
+  if (isWatchOrWorse(signals.utilization) && isWatchOrWorse(signals.orderTrend)) {
+    tierScore += 25;
+    interactionFlags.push({
+      rule: "UTILIZATION_ORDER_STRESS",
+      description: "High credit utilization combined with declining order volume",
+      scoreBoost: 25,
+      floor: "AT_RISK",
+    });
+  }
+
+  // --- 2. Worsening DPO + declining orders ---
+  // Both repayment behavior and business health are deteriorating together.
+  // DPO rising alone might be a temporary cash flow issue; combined with falling
+  // orders it signals a structural problem — the business itself is shrinking.
+  if (
+    (isWatchOrWorse(signals.dpo) || isWatchOrWorse(signals.dpoVelocity)) &&
+    isWatchOrWorse(signals.orderTrend)
+  ) {
+    tierScore += 20;
+    interactionFlags.push({
+      rule: "DPO_ORDER_DETERIORATION",
+      description: "Payment delays worsening alongside declining business activity",
+      scoreBoost: 20,
+      floor: null,
+    });
+  }
+
+  // --- 3. Low payment coverage + repeated late payments ---
+  // Not just underpaying EMI, but also paying late. This distinguishes genuine
+  // cash stress (can't pay on time or in full) from administrative delays
+  // (pays late but covers the full amount).
+  if (
+    isWatchOrWorse(signals.paymentCoverage) &&
+    isWatchOrWorse(signals.latePayments)
+  ) {
+    tierScore += 25;
+    interactionFlags.push({
+      rule: "PAYMENT_STRESS",
+      description: "Underpaying EMI and making late payments — active cash crisis",
+      scoreBoost: 25,
+      floor: "AT_RISK",
+    });
+  }
+
+  // --- Re-determine tier with updated score and interaction floors ---
+  // Preserve CRITICAL if already set by a single-signal override.
+  if (tier !== "CRITICAL") {
+    // Apply score-based tier
+    if (tierScore >= 60) {
+      tier = "AT_RISK";
+    } else if (tierScore >= 25) {
+      tier = "WATCH";
+    }
+
+    // Apply tier floors from interactions
+    const TIER_RANK = { HEALTHY: 0, WATCH: 1, AT_RISK: 2, CRITICAL: 3 };
+    for (const flag of interactionFlags) {
+      if (flag.floor && TIER_RANK[flag.floor] > TIER_RANK[tier]) {
+        tier = flag.floor;
+      }
+    }
+  }
+
+  return { tier, tierScore, signals, interactionFlags };
+}
+
+/**
  * Calculate 30-day default probability.
  *
  * This is a forward-looking score (0.0 – 1.0) estimating likelihood of default
@@ -489,7 +584,8 @@ function analyzeDealerRisk(dealer, transactions) {
     );
   }
 
-  const classification = classifyDealerTier(metrics);
+  const rawClassification = classifyDealerTier(metrics);
+  const classification = applyInteractionEscalation(rawClassification, metrics);
   const defaultProbability = calculate30DayDefaultProbability(metrics);
 
   return {
@@ -501,6 +597,7 @@ function analyzeDealerRisk(dealer, transactions) {
     tierScore: classification.tierScore,
     defaultProbability,
     signals: classification.signals,
+    interactionFlags: classification.interactionFlags,
     metrics: { ...metrics, missingDataFlags },
     createdAt: dealer.createdAt,
     lastUpdated: transactions[transactions.length - 1].month,
@@ -511,7 +608,7 @@ function analyzeDealerRisk(dealer, transactions) {
  * Generate human-readable explanation for a dealer flag
  */
 function generateExplanation(assessment) {
-  const { tier, signals, metrics, defaultProbability } = assessment;
+  const { tier, signals, metrics, defaultProbability, interactionFlags } = assessment;
 
   const explanation = [];
 
@@ -622,6 +719,13 @@ function generateExplanation(assessment) {
     );
   }
 
+  // Signal interactions
+  if (interactionFlags && interactionFlags.length > 0) {
+    explanation.push(
+      `• Compounding risk: ${interactionFlags.map((f) => f.description).join("; ")}.`,
+    );
+  }
+
   // Missing data warnings
   if (metrics.missingDataFlags && metrics.missingDataFlags.length > 0) {
     explanation.push(`• Data quality: ${metrics.missingDataFlags.join("; ")}.`);
@@ -634,6 +738,7 @@ module.exports = {
   RISK_TIERS,
   THRESHOLDS,
   classifyDealerTier,
+  applyInteractionEscalation,
   calculateMetrics,
   calculate30DayDefaultProbability,
   analyzeDealerRisk,

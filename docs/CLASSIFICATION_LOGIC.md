@@ -60,6 +60,27 @@ If a dealer has less than 3 months of data, the score gets scaled down by a conf
 
 ---
 
+## Signal Interaction Escalation
+
+Individual signals are scored independently, but certain **combinations** are qualitatively worse than the sum of their parts. After individual signals are classified, the system checks for three high-conviction interaction patterns. Each interaction can add bonus score points and/or impose a minimum tier floor.
+
+| Interaction | Signals Involved | Score Boost | Tier Floor | Business Meaning |
+|-------------|-----------------|-------------|------------|------------------|
+| **UTILIZATION_ORDER_STRESS** | Utilization ≥ WATCH + Order Trend ≥ WATCH | +25 | AT_RISK | Heavily drawn on credit while business is shrinking — can't grow out of debt |
+| **DPO_ORDER_DETERIORATION** | (DPO ≥ WATCH or DPO Velocity ≥ WATCH) + Order Trend ≥ WATCH | +20 | — | Paying slower AND getting fewer orders — both sides of business equation deteriorating |
+| **PAYMENT_STRESS** | Payment Coverage ≥ WATCH + Late Payments ≥ WATCH | +25 | AT_RISK | Not just underpaying EMI but also paying late — active cash crisis, not administrative delay |
+
+**How it works:**
+1. Individual signals fire and produce a tier score + preliminary tier (as before).
+2. The interaction layer checks combinations. If both sides are at WATCH level or worse, the rule fires.
+3. Score boosts are added to the tier score. The tier is re-evaluated using the same thresholds (≥60 = AT_RISK, ≥25 = WATCH).
+4. If any interaction imposes a tier floor higher than the current tier, the tier is raised to the floor.
+5. A CRITICAL tier set by a single-signal override is never downgraded.
+
+Interaction flags are exposed in the assessment output (`interactionFlags` array) and mentioned in both the deterministic and LLM-generated explanations for full transparency.
+
+---
+
 ## Why These Specific Thresholds?
 
 - **DPO 90 days** — RBI classifies 90+ days past due as NPA (Non-Performing Asset). This is non-negotiable.

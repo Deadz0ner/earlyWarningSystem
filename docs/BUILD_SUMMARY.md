@@ -13,7 +13,7 @@ A production-ready early warning system for NBFC dealer portfolio risk detection
 ### Core Components
 
 1. **Synthetic Data Generator** (`src/data/generateSyntheticData.js`) — 100 dealers, 2 anchors, 4 credit profiles, 5 behavioral archetypes, 12 months of transaction data
-2. **Risk Classification Engine** (`src/engine/riskEngine.js`) — 4-tier system with 7 signal dimensions, deterministic scoring, 30-day default probability
+2. **Risk Classification Engine** (`src/engine/riskEngine.js`) — 4-tier system with 7 signal dimensions, signal interaction escalation, deterministic scoring, 30-day default probability
 3. **Database Layer** (`src/data/database.js`) — SQLite with 3 tables (dealers, transactions, risk_assessments)
 4. **API Server** (`src/api/server.js`) — Express.js with 7 REST endpoints + LLM integration for explanations
 5. **Dashboard** — Built-in static HTML (`public/`) + React frontend (`frontend/`) with Vite, Recharts, Lucide
@@ -28,9 +28,10 @@ A production-ready early warning system for NBFC dealer portfolio risk detection
 - Thresholds based on domain knowledge (RBI guidelines)
 - Future: Retrain on real defaults after 6–12 months
 
-### 2. Simple Thresholds for Auditability
+### 2. Simple Thresholds + Interaction Escalation for Auditability
 - "If DPO >= 90d, then CRITICAL" is transparent
-- Ops teams can understand and challenge thresholds
+- Signal interactions explicitly checked: e.g., high utilization + declining orders escalates risk beyond what either signal alone would produce
+- Interaction rules are few, named, and exposed in the output (`interactionFlags`) — easy for ops to understand and challenge
 - Easy to adjust based on actual portfolio performance
 
 ### 3. LLM for Explanations, Not Scoring

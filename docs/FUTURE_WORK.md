@@ -5,9 +5,10 @@
 ## High Priority (3-6 Months)
 
 ### 1. LLM-Based Anomaly Detection
-Right now the LLM only writes explanations. With more data, I'd have it analyze whether unusual *combinations* of metrics signal hidden stress that individual thresholds miss. For example: a dealer with steady orders but a sudden 45-day DPO jump might be diverting cash flow. Individual thresholds might not catch this, but an LLM analyzing the pattern against the dealer's history could.
+The system now has a deterministic **signal interaction escalation layer** that catches three high-conviction compounding patterns (e.g., high utilization + declining orders). This addresses the most obvious signal combinations with hard rules. But there are subtler multivariate anomalies that rules alone won't catch — for example, a dealer with steady orders but a sudden 45-day DPO jump might be diverting cash flow. With more data, I'd have the LLM analyze whether unusual metric patterns signal hidden stress that the rule-based interactions don't cover.
 
 **Needs:** 3-6 months of historical patterns per dealer to validate against.
+**Already done:** Deterministic interaction rules for 3 high-conviction combinations (see [CLASSIFICATION_LOGIC.md](CLASSIFICATION_LOGIC.md)).
 
 ### 2. Anchor-Level Risk Cascading
 Currently each dealer is assessed independently. If an anchor is struggling (high average DPO across all its dealers, rising default rate), that risk should cascade down — lower thresholds for all dealers under that anchor. If the anchor fails, every dealer connected to it is at elevated risk.
